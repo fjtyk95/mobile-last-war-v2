@@ -26,16 +26,16 @@ export const GAME_BALANCE = {
     WIDTH: 40,
     HEIGHT: 40,
     DAMAGE_TO_PLAYER: 20,
-    BASE_SPAWN_INTERVAL: 1500, // 1.5秒
-    MIN_SPAWN_INTERVAL: 700,   // 0.7秒
-    BASE_SPEED: 1.5,
-    MAX_SPEED: 3.5,
+    BASE_SPAWN_INTERVAL: 1200, // 1.2秒（スマホ向け速く）
+    MIN_SPAWN_INTERVAL: 500,   // 0.5秒（より速く）
+    BASE_SPEED: 2.0,           // 基本速度アップ
+    MAX_SPEED: 4.0,            // 最大速度アップ
     GAME_OVER_ZONE_RATIO: 0.8, // 画面下部80%（プレイヤーエリア）に到達でゲームオーバー
   },
 
   // レベルシステム
   LEVEL: {
-    ENEMIES_PER_LEVEL: 10, // 10体撃破でレベルアップ
+    ENEMIES_PER_LEVEL: 8, // 8体撃破でレベルアップ（スマホ向け調整）
     MAX_LEVEL_FOR_SCALING: 10, // レベル10まで難易度上昇
     SCORE_MULTIPLIER_THRESHOLD: 11, // レベル11以降スコア1.5倍
   },
@@ -59,17 +59,17 @@ export const GAME_BALANCE = {
     HIGH_LEVEL_MULTIPLIER: 1.5, // レベル11以降
   },
 
-  // 難易度カーブ
+  // 難易度カーブ（スマホ向け調整）
   DIFFICULTY: {
-    // レベル1-5: 線形増加
+    // レベル1-5: より急激な増加
     LEVEL_1_5: {
-      SPAWN_REDUCTION_PER_LEVEL: 100, // ms
-      SPEED_INCREASE_PER_LEVEL: 0.2,
+      SPAWN_REDUCTION_PER_LEVEL: 120, // ms（より速く）
+      SPEED_INCREASE_PER_LEVEL: 0.3,  // より速度アップ
     },
-    // レベル6-10: 急激な増加
+    // レベル6-10: 非常に急激な増加
     LEVEL_6_10: {
-      SPAWN_REDUCTION_PER_LEVEL: 60, // ms
-      SPEED_INCREASE_PER_LEVEL: 0.2,
+      SPAWN_REDUCTION_PER_LEVEL: 80, // ms（より速く）
+      SPEED_INCREASE_PER_LEVEL: 0.3, // より速度アップ
     },
   },
 

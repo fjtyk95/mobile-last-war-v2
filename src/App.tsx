@@ -329,11 +329,13 @@ function App() {
         enemyRenderer.current = new EnemyRenderer(ctx)
       }
       
-      // デバッグ: 敵の数を表示
+      // デバッグ: ゲーム状態表示
       ctx.fillStyle = '#00ff00'
       ctx.font = '12px Arial'
       ctx.textAlign = 'left'
-      ctx.fillText(`Enemies: ${enemySystem.enemies.length}`, 10, canvas.height - 20)
+      ctx.fillText(`Enemies: ${enemySystem.enemies.length}`, 10, canvas.height - 50)
+      ctx.fillText(`Killed: ${gameState.enemiesKilled}`, 10, canvas.height - 35)
+      ctx.fillText(`Level: ${gameState.level}`, 10, canvas.height - 20)
       
       if (enemyRenderer.current && enemySystem.enemies.length > 0) {
         enemyRenderer.current.drawEnemies(enemySystem.enemies)
@@ -541,21 +543,27 @@ function App() {
     <div className="app">
       {/* ゲームUI - HPバー削除（敵エリア到達でゲームオーバーのため） */}
       
-      {/* ポーズボタン */}
+      {/* ポーズボタン - 右下配置（スマホ操作性向上） */}
       <button
         onClick={handlePause}
         style={{
           position: 'absolute',
-          top: '20px',
+          bottom: '20px',
           right: '20px',
           zIndex: 10,
-          background: 'rgba(0,0,0,0.7)',
+          background: 'rgba(0,0,0,0.8)',
           color: 'white',
           border: '2px solid #fff',
-          padding: '10px 15px',
-          borderRadius: '8px',
-          fontSize: '18px',
-          cursor: 'pointer'
+          padding: '12px 16px',
+          borderRadius: '50%',
+          fontSize: '20px',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          minWidth: '50px',
+          minHeight: '50px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
       >
         ⏸
