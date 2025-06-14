@@ -79,6 +79,14 @@ export const GAME_BALANCE = {
     INTERMEDIATE: 120, // 2分
     ADVANCED: 300, // 5分
   },
+
+  // 時間ベース難易度調整（緩やかな上昇）
+  TIME_DIFFICULTY: {
+    INTERVAL_SECONDS: 15, // 15秒ごとに難易度調整
+    SPAWN_REDUCTION_PER_INTERVAL: 30, // ms削減（緩やか）
+    SPEED_INCREASE_PER_INTERVAL: 0.1, // 速度増加（約10%ずつ）
+    MAX_TIME_LEVEL: 20, // 最大時間レベル（5分）
+  },
 } as const
 
 // 難易度計算関数
@@ -114,6 +122,39 @@ export const getDifficultyParams = (level: number) => {
       enemySpeed: GAME_BALANCE.ENEMY.MAX_SPEED,
       scoreMultiplier: GAME_BALANCE.SCORE.HIGH_LEVEL_MULTIPLIER,
     }
+  }
+}
+
+// 時間ベース難易度計算関数（永続ゲーム防止）
+export const getTimeDifficultyParams = (survivalTimeSeconds: number) => {
+  const timeLevel = Math.min(
+    Math.floor(survivalTimeSeconds / GAME_BALANCE.TIME_DIFFICULTY.INTERVAL_SECONDS),
+    GAME_BALANCE.TIME_DIFFICULTY.MAX_TIME_LEVEL
+  )
+  
+  return {
+    spawnReduction: timeLevel * GAME_BALANCE.TIME_DIFFICULTY.SPAWN_REDUCTION_PER_INTERVAL,
+    speedIncrease: timeLevel * GAME_BALANCE.TIME_DIFFICULTY.SPEED_INCREASE_PER_INTERVAL,
+    timeLevel
+  }
+}
+
+// 撃破数レベル + 時間レベルを統合した最終難易度計算
+export const getFinalDifficultyParams = (killLevel: number, survivalTimeSeconds: number) => {
+  const baseDifficulty = getDifficultyParams(killLevel)
+  const timeDifficulty = getTimeDifficultyParams(survivalTimeSeconds)
+  
+  return {
+    spawnInterval: Math.max(
+      GAME_BALANCE.ENEMY.MIN_SPAWN_INTERVAL,
+      baseDifficulty.spawnInterval - timeDifficulty.spawnReduction
+    ),
+    enemySpeed: Math.min(
+      GAME_BALANCE.ENEMY.MAX_SPEED,
+      baseDifficulty.enemySpeed + timeDifficulty.speedIncrease
+    ),
+    scoreMultiplier: baseDifficulty.scoreMultiplier,
+    timeLevel: timeDifficulty.timeLevel
   }
 }
 

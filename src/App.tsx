@@ -15,7 +15,7 @@ import { Enemy, Bullet, GameStatus, PowerUpType } from './types/game.types'
 import { EnemyType } from './types/enemy.types'
 import { Achievement } from './types/gameStats.types'
 import { EnemyRenderer } from './utils/enemyRenderer'
-import { GAME_BALANCE } from './constants/gameBalance'
+import { GAME_BALANCE, getFinalDifficultyParams } from './constants/gameBalance'
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -131,9 +131,8 @@ function App() {
       
       // プレイヤー無敵時間更新削除（HP制なし）
 
-      // 統計更新
+      // 統計更新（撃破数カウンター削除）
       gameStats.updateScore(gameState.score)
-      gameStats.updateKills(gameState.enemiesKilled)
       gameStats.updatePowerUps(gameState.powerUpsCollected)
       gameStats.updateLevel(gameState.level)
 
@@ -141,8 +140,9 @@ function App() {
       visualEffects.updateEffects(deltaTime, currentTime)
       visualEffects.setLevelMultiplier(gameState.level)
 
-      // 現在の難易度取得
-      const difficulty = gameState.getCurrentDifficulty()
+      // 時間ベース統合難易度取得（永続ゲーム防止）
+      const survivalTime = Math.floor(gameState.time / 1000)
+      const difficulty = getFinalDifficultyParams(gameState.level, survivalTime)
 
       // Clear canvas
       ctx.fillStyle = '#1a1a2e'
@@ -329,13 +329,7 @@ function App() {
         enemyRenderer.current = new EnemyRenderer(ctx)
       }
       
-      // デバッグ: ゲーム状態表示
-      ctx.fillStyle = '#00ff00'
-      ctx.font = '12px Arial'
-      ctx.textAlign = 'left'
-      ctx.fillText(`Enemies: ${enemySystem.enemies.length}`, 10, canvas.height - 50)
-      ctx.fillText(`Killed: ${gameState.enemiesKilled}`, 10, canvas.height - 35)
-      ctx.fillText(`Level: ${gameState.level}`, 10, canvas.height - 20)
+      // デバッグ表示削除（プロダクション版）
       
       if (enemyRenderer.current && enemySystem.enemies.length > 0) {
         enemyRenderer.current.drawEnemies(enemySystem.enemies)
