@@ -10,6 +10,8 @@ import { usePowerUps } from './hooks/usePowerUps'
 import { useAutoFire } from './hooks/useAutoFire'
 import { useEnemySystem } from './hooks/useEnemySystem'
 import { useGameStats } from './hooks/useGameStats'
+import { useVisualEffects } from './hooks/useVisualEffects'
+import { useAudioSystem } from './hooks/useAudioSystem'
 import { Enemy, Bullet, GameStatus, PowerUpType } from './types/game.types'
 import { EnemyType } from './types/enemy.types'
 import { Achievement } from './types/gameStats.types'
@@ -19,6 +21,7 @@ import { GAME_BALANCE } from './constants/gameBalance'
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [canvasHeight, setCanvasHeight] = useState(600)
+  const [canvasWidth, setCanvasWidth] = useState(800)
   const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null)
   
   // カスタムフック
@@ -26,6 +29,16 @@ function App() {
   const gameState = useGameState()
   const powerUps = usePowerUps()
   const gameStats = useGameStats()
+  
+  // 視覚エフェクトシステム
+  const visualEffects = useVisualEffects({
+    canvasWidth: canvasWidth,
+    canvasHeight: canvasHeight,
+    isGamePlaying: gameState.status === GameStatus.PLAYING
+  })
+  
+  // 音響システム
+  const audioSystem = useAudioSystem()
   
   // 自動連射システム
   const autoFire = useAutoFire({
@@ -60,6 +73,8 @@ function App() {
     autoFire.resetAutoFire()
     enemySystem.resetEnemySystem()
     gameStats.startGameSession()
+    visualEffects.clearEffects()
+    audioSystem.initializeAudio() // ユーザー操作による音響初期化
     gameData.current = {
       bullets: [],
       lastTime: 0,
@@ -90,6 +105,7 @@ function App() {
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
     setCanvasHeight(canvas.height)
+    setCanvasWidth(canvas.width)
 
     // 敵レンダラー初期化
     if (!enemyRenderer.current) {
@@ -119,12 +135,19 @@ function App() {
       gameStats.updatePowerUps(gameState.powerUpsCollected)
       gameStats.updateLevel(gameState.level)
 
+      // 視覚エフェクト更新
+      visualEffects.updateEffects(deltaTime, currentTime)
+      visualEffects.setLevelMultiplier(gameState.level)
+
       // 現在の難易度取得
       const difficulty = gameState.getCurrentDifficulty()
 
       // Clear canvas
       ctx.fillStyle = '#1a1a2e'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      // 背景エフェクト描画（スターフィールド）
+      visualEffects.renderEffects(ctx)
 
       // Draw game over line (danger zone indicator) - プレイヤーエリア境界
       const gameOverLine = canvas.height * GAME_BALANCE.ENEMY.GAME_OVER_ZONE_RATIO
@@ -147,6 +170,10 @@ function App() {
       const newBullet = autoFire.tryAutoFire(currentTime)
       if (newBullet) {
         gameData.current.bullets.push(newBullet)
+        // 射撃エフェクト
+        visualEffects.createShootEffect(player.position.x + GAME_BALANCE.PLAYER.WIDTH / 2, player.position.y)
+        // 射撃音
+        audioSystem.playShootSound()
       }
 
       // 新しい敵システムでのスポーン
@@ -174,11 +201,14 @@ function App() {
         console.log('Game Over triggered by enemy reaching player area!')
         gameState.gameOver()
         gameStats.endGameSession('game_over')
+        audioSystem.playGameOverSound()
         
         // 実績チェック
         const newAchievements = gameStats.checkAndUnlockAchievements(gameStats.gameStats)
         if (newAchievements.length > 0) {
           setCurrentAchievement(newAchievements[0])
+          visualEffects.createAchievementEffect()
+          audioSystem.playAchievementSound()
         }
         return // ゲームオーバー時は処理を停止
       }
@@ -194,6 +224,16 @@ function App() {
               player.position.y < enemy.position.y + enemy.stats.height &&
               player.position.y + GAME_BALANCE.PLAYER.HEIGHT > enemy.position.y) {
             player.takeDamage(GAME_BALANCE.ENEMY.DAMAGE_TO_PLAYER)
+            
+            // プレイヤーダメージエフェクト
+            visualEffects.createPlayerDamageEffect(
+              player.position.x + GAME_BALANCE.PLAYER.WIDTH / 2,
+              player.position.y + GAME_BALANCE.PLAYER.HEIGHT / 2
+            )
+            
+            // プレイヤーダメージ音
+            audioSystem.playDamageSound()
+            
             // 敵を削除（ダメージで体力を0にする）
             enemySystem.damageEnemy(enemy.id, enemy.stats.health)
           }
@@ -209,6 +249,16 @@ function App() {
               player.position.y < bullet.y + bullet.height &&
               player.position.y + GAME_BALANCE.PLAYER.HEIGHT > bullet.y) {
             player.takeDamage(GAME_BALANCE.ENEMY.DAMAGE_TO_PLAYER)
+            
+            // プレイヤーダメージエフェクト
+            visualEffects.createPlayerDamageEffect(
+              player.position.x + GAME_BALANCE.PLAYER.WIDTH / 2,
+              player.position.y + GAME_BALANCE.PLAYER.HEIGHT / 2
+            )
+            
+            // プレイヤーダメージ音
+            audioSystem.playDamageSound()
+            
             // 弾を削除
             enemySystem.removeEnemyBullet(bullet.id)
           }
@@ -242,6 +292,16 @@ function App() {
             if (enemyDestroyed) {
               gameState.addEnemyKill()
               
+              // 敵撃破エフェクト
+              visualEffects.createEnemyDestroyEffect(
+                enemy.position.x + enemy.stats.width / 2,
+                enemy.position.y + enemy.stats.height / 2,
+                enemy.type
+              )
+              
+              // 敵撃破音
+              audioSystem.playEnemyDestroySound(enemy.type)
+              
               // パワーアップスポーン（撃破時の確率）
               if (Math.random() < enemy.stats.powerUpDropRate) {
                 powerUps.spawnPowerUp({ x: enemy.position.x, y: enemy.position.y })
@@ -261,6 +321,16 @@ function App() {
             gameData.current.bullets.splice(bulletIndex, 1)
             powerUps.collectPowerUp(powerUp.id, 'shoot', player)
             gameState.addPowerUpCollection()
+            
+            // パワーアップ収集エフェクト（弾による撃破 = 良い効果）
+            visualEffects.createPowerUpCollectEffect(
+              powerUp.position.x + powerUp.width / 2,
+              powerUp.position.y + powerUp.height / 2,
+              true
+            )
+            
+            // パワーアップ収集音（良い効果）
+            audioSystem.playPowerUpSound(true)
           }
         })
       })
@@ -274,6 +344,16 @@ function App() {
               player.position.y + GAME_BALANCE.PLAYER.HEIGHT > powerUp.position.y) {
             powerUps.collectPowerUp(powerUp.id, 'touch', player)
             gameState.addPowerUpCollection()
+            
+            // パワーアップ収集エフェクト（直接接触 = 悪い効果）
+            visualEffects.createPowerUpCollectEffect(
+              powerUp.position.x + powerUp.width / 2,
+              powerUp.position.y + powerUp.height / 2,
+              false
+            )
+            
+            // パワーアップ収集音（悪い効果）
+            audioSystem.playPowerUpSound(false)
           }
         })
       }
@@ -282,11 +362,14 @@ function App() {
       if (player.isDead() && gameState.status === GameStatus.PLAYING) {
         gameState.gameOver()
         gameStats.endGameSession('game_over')
+        audioSystem.playGameOverSound()
         
         // 実績チェック
         const newAchievements = gameStats.checkAndUnlockAchievements(gameStats.gameStats)
         if (newAchievements.length > 0) {
           setCurrentAchievement(newAchievements[0])
+          visualEffects.createAchievementEffect()
+          audioSystem.playAchievementSound()
         }
       }
 
@@ -457,26 +540,46 @@ function App() {
             実績: {gameStats.gameStats.achievements.length} 個解除
           </div>
         </div>
-        <button
-          onClick={startGame}
-          data-testid="start-game-button"
-          style={{
-            background: 'linear-gradient(45deg, #ff4444, #ff6666)',
-            color: 'white',
-            border: 'none',
-            padding: '20px 40px',
-            fontSize: '24px',
-            borderRadius: '12px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 20px rgba(255, 68, 68, 0.4)',
-            transition: 'all 0.3s',
-            fontFamily: "'Courier New', monospace"
-          }}
-          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          🚀 ゲーム開始
-        </button>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', justifyContent: 'center' }}>
+          <button
+            onClick={startGame}
+            data-testid="start-game-button"
+            style={{
+              background: 'linear-gradient(45deg, #ff4444, #ff6666)',
+              color: 'white',
+              border: 'none',
+              padding: '20px 40px',
+              fontSize: '24px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(255, 68, 68, 0.4)',
+              transition: 'all 0.3s',
+              fontFamily: "'Courier New', monospace"
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            🚀 ゲーム開始
+          </button>
+          
+          <button
+            onClick={audioSystem.toggleMute}
+            style={{
+              background: audioSystem.settings.muted ? 'rgba(255, 68, 68, 0.7)' : 'rgba(68, 255, 68, 0.7)',
+              color: 'white',
+              border: 'none',
+              padding: '15px 20px',
+              fontSize: '20px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              fontFamily: "'Courier New', monospace"
+            }}
+            title={audioSystem.settings.muted ? '音響をオンにする' : '音響をオフにする'}
+          >
+            {audioSystem.settings.muted ? '🔇' : '🔊'}
+          </button>
+        </div>
       </div>
     )
   }
