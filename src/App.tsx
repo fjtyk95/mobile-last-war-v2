@@ -2,24 +2,30 @@ import React, { useEffect, useRef, useState } from 'react'
 import { HealthBar } from './components/Game/HealthBar'
 import { GameOverScreen } from './components/Game/GameOverScreen'
 import { PauseMenu } from './components/Game/PauseMenu'
+import { StatsDisplay } from './components/Game/StatsDisplay'
+import { AchievementNotification } from './components/Game/AchievementNotification'
 import { usePlayer } from './hooks/usePlayer'
 import { useGameState } from './hooks/useGameState'
 import { usePowerUps } from './hooks/usePowerUps'
 import { useAutoFire } from './hooks/useAutoFire'
 import { useEnemySystem } from './hooks/useEnemySystem'
+import { useGameStats } from './hooks/useGameStats'
 import { Enemy, Bullet, GameStatus, PowerUpType } from './types/game.types'
 import { EnemyType } from './types/enemy.types'
+import { Achievement } from './types/gameStats.types'
 import { EnemyRenderer } from './utils/enemyRenderer'
 import { GAME_BALANCE } from './constants/gameBalance'
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [canvasHeight, setCanvasHeight] = useState(600)
+  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null)
   
   // カスタムフック
   const player = usePlayer(canvasHeight)
   const gameState = useGameState()
   const powerUps = usePowerUps()
+  const gameStats = useGameStats()
   
   // 自動連射システム
   const autoFire = useAutoFire({
@@ -53,6 +59,7 @@ function App() {
     powerUps.clearPowerUps()
     autoFire.resetAutoFire()
     enemySystem.resetEnemySystem()
+    gameStats.startGameSession()
     gameData.current = {
       bullets: [],
       lastTime: 0,
@@ -105,6 +112,12 @@ function App() {
       
       // プレイヤー無敵時間更新
       player.updateInvulnerability(deltaTime)
+
+      // 統計更新
+      gameStats.updateScore(gameState.score)
+      gameStats.updateKills(gameState.enemiesKilled)
+      gameStats.updatePowerUps(gameState.powerUpsCollected)
+      gameStats.updateLevel(gameState.level)
 
       // 現在の難易度取得
       const difficulty = gameState.getCurrentDifficulty()
@@ -160,6 +173,13 @@ function App() {
       if (gameOverTriggered) {
         console.log('Game Over triggered by enemy reaching player area!')
         gameState.gameOver()
+        gameStats.endGameSession('game_over')
+        
+        // 実績チェック
+        const newAchievements = gameStats.checkAndUnlockAchievements(gameStats.gameStats)
+        if (newAchievements.length > 0) {
+          setCurrentAchievement(newAchievements[0])
+        }
         return // ゲームオーバー時は処理を停止
       }
       
@@ -261,6 +281,13 @@ function App() {
       // ゲームオーバー判定
       if (player.isDead() && gameState.status === GameStatus.PLAYING) {
         gameState.gameOver()
+        gameStats.endGameSession('game_over')
+        
+        // 実績チェック
+        const newAchievements = gameStats.checkAndUnlockAchievements(gameStats.gameStats)
+        if (newAchievements.length > 0) {
+          setCurrentAchievement(newAchievements[0])
+        }
       }
 
       // Draw player (triangle spaceship)
@@ -402,8 +429,33 @@ function App() {
           ⚡ 攻撃力UPで連射速度UP<br/>
           🎯 弾で撃破 = ボーナス / 接触 = ペナルティ
         </p>
-        <div style={{ marginBottom: '40px', color: '#aaa', fontSize: '14px' }}>
-          High Score: {gameState.highScore.toLocaleString()}
+        {/* 統計サマリー */}
+        <div style={{ 
+          marginBottom: '40px', 
+          background: 'rgba(0,0,0,0.3)', 
+          padding: '20px', 
+          borderRadius: '15px',
+          textAlign: 'center',
+          border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <div style={{ color: '#ffd700', fontSize: '20px', fontWeight: 'bold', marginBottom: '10px' }}>
+            📊 プレイヤー統計
+          </div>
+          <div style={{ color: '#ff4444', fontSize: '16px', marginBottom: '5px' }}>
+            ハイスコア: {gameStats.gameStats.highScore.toLocaleString()}
+          </div>
+          <div style={{ color: '#51cf66', fontSize: '14px', marginBottom: '5px' }}>
+            最長生存: {gameStats.getPlayTimeFormatted(gameStats.gameStats.bestSurvivalTime)}
+          </div>
+          <div style={{ color: '#74c0fc', fontSize: '14px', marginBottom: '5px' }}>
+            総プレイ回数: {gameStats.gameStats.totalGamesPlayed} 回
+          </div>
+          <div style={{ color: '#a78bfa', fontSize: '14px', marginBottom: '5px' }}>
+            累計撃破数: {gameStats.gameStats.totalEnemiesKilled.toLocaleString()} 体
+          </div>
+          <div style={{ color: '#fbbf24', fontSize: '14px' }}>
+            実績: {gameStats.gameStats.achievements.length} 個解除
+          </div>
         </div>
         <button
           onClick={startGame}
@@ -454,34 +506,12 @@ function App() {
         ⏸
       </button>
 
-      {/* スコア・レベル表示 */}
-      <div style={{ 
-        position: 'absolute', 
-        top: '60px', 
-        left: '20px', 
-        zIndex: 10, 
-        background: 'rgba(0,0,0,0.7)', 
-        padding: '10px', 
-        borderRadius: '8px',
-        color: 'white',
-        fontFamily: "'Courier New', monospace"
-      }}>
-        <div style={{ color: '#ff4444', fontSize: '20px', fontWeight: 'bold' }}>
-          スコア: {gameState.score.toLocaleString()}
-        </div>
-        <div style={{ color: '#0066ff', fontSize: '16px' }}>
-          レベル: {gameState.level} ({gameState.difficultyCalculator.getDifficultyDescription()})
-        </div>
-        <div style={{ color: '#51cf66', fontSize: '14px' }}>
-          攻撃力: {player.power} (連射: {autoFire.getFireRateInfo().shotsPerSecond}/秒)
-        </div>
-        <div style={{ color: '#74c0fc', fontSize: '14px' }}>
-          撃破: {gameState.enemiesKilled}
-        </div>
-        <div style={{ color: '#fbbf24', fontSize: '12px' }}>
-          次レベルまで: {gameState.difficultyCalculator.getEnemiesUntilNextLevel()}体
-        </div>
-      </div>
+      {/* 拡張統計表示 */}
+      <StatsDisplay 
+        stats={gameStats.gameStats}
+        getPlayTimeFormatted={gameStats.getPlayTimeFormatted}
+        getEfficiencyRating={gameStats.getEfficiencyRating}
+      />
 
       {/* ゲームキャンバス */}
       <canvas ref={canvasRef} className="game-canvas" data-testid="game-canvas" />
@@ -503,6 +533,12 @@ function App() {
           onMenu={handleGoToMenu}
         />
       )}
+
+      {/* 実績通知 */}
+      <AchievementNotification
+        achievement={currentAchievement}
+        onClose={() => setCurrentAchievement(null)}
+      />
     </div>
   )
 }
