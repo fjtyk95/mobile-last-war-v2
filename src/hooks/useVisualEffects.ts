@@ -31,7 +31,21 @@ export const useVisualEffects = ({ canvasWidth, canvasHeight, isGamePlaying }: U
     }
   }, [isGamePlaying])
 
-  // エフェクト描画
+  // 背景描画
+  const renderBackground = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (visualEffects.current) {
+      visualEffects.current.renderBackground(ctx)
+    }
+  }, [])
+
+  // パーティクル描画
+  const renderParticles = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (visualEffects.current) {
+      visualEffects.current.renderParticles(ctx)
+    }
+  }, [])
+
+  // エフェクト描画（互換性のため残す）
   const renderEffects = useCallback((ctx: CanvasRenderingContext2D) => {
     if (visualEffects.current) {
       visualEffects.current.render(ctx)
@@ -123,6 +137,8 @@ export const useVisualEffects = ({ canvasWidth, canvasHeight, isGamePlaying }: U
 
   return {
     updateEffects,
+    renderBackground,
+    renderParticles,
     renderEffects,
     createEnemyDestroyEffect,
     createShootEffect,

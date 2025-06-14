@@ -296,74 +296,111 @@ enum GameStatus {
 
 ---
 
-## 🎨 Phase 5: 視覚・音響効果システム 📋 **実装中**
+## 🎨 Phase 5: 視覚・音響効果システム ✅ **完了**
 
 ### 🎯 実装目標
 Canvas APIベースの高性能エフェクトシステムとサウンド統合
 
-### 📝 実装タスク
+### 実装済み機能
+- [x] **パーティクルエフェクトシステム**
+  - 爆発エフェクト（敵タイプ別強度調整）
+  - マズルフラッシュ（射撃時）
+  - パワーアップ収集エフェクト（良い/悪い効果別）
+  - プレイヤーダメージエフェクト
+  - 実績解除セレブレーション
+- [x] **背景スターフィールド**
+  - 動的スター生成・きらめきアニメーション
+  - レベル対応背景スピード調整
+  - パフォーマンス最適化されたライフサイクル管理
+- [x] **Web Audio APIサウンドシステム**
+  - プロシージャル音響生成（8種類の効果音）
+  - 射撃音・爆発音・パワーアップ音・ダメージ音
+  - 実績解除音・レベルアップ音・ゲームオーバー音
+  - 敵タイプ別爆発音の強度調整
+- [x] **スクリーンシェイクエフェクト**
+  - Tank・Boss撃破時の大型シェイク
+  - プレイヤーダメージ時のシェイク
+  - エフェクト強度の動的調整
+- [x] **音響管理システム**
+  - 音量・ミュート設定の永続化
+  - ブラウザ互換のユーザー操作ベース初期化
+  - リアルタイム音響設定変更
 
-#### 5.1 パーティクルエフェクトシステム
-```typescript
-// 爆発・射撃・トレイル用パーティクルエンジン
-interface Particle {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  life: number
-  maxLife: number
-  color: string
-  size: number
-}
-
-class ParticleSystem {
-  createExplosion(x: number, y: number): void
-  createMuzzleFlash(x: number, y: number): void
-  createTrail(x: number, y: number): void
-  update(deltaTime: number): void
-  render(ctx: CanvasRenderingContext2D): void
-}
-```
-
-#### 5.2 視覚エフェクト実装
-- [x] 敵撃破時の爆発エフェクト
-- [x] 射撃時のマズルフラッシュ
-- [x] プレイヤー移動トレイル（オプション）
-- [x] パワーアップ収集エフェクト
-- [x] 背景のスターフィールド
-- [x] ダメージフラッシュ強化
-
-#### 5.3 Web Audio API統合
-```typescript
-// サウンドマネージャー
-class AudioManager {
-  playShootSound(): void
-  playExplosionSound(): void
-  playPowerUpSound(): void
-  playBackgroundMusic(): void
-  setVolume(volume: number): void
-  mute(muted: boolean): void
-}
-```
-
-#### 5.4 効果音・BGM実装
-- [x] 射撃音（自動連射対応）
-- [x] 敵撃破音（タイプ別）
-- [x] パワーアップ取得音（良い/悪い）
-- [x] ゲームオーバー音
-- [x] 実績解除音
-- [x] 背景音楽（レベル別変化）
-
-### 📊 成果物予定
+### 📊 成果物
 - `src/effects/ParticleSystem.ts` - パーティクルエンジン
+- `src/effects/StarField.ts` - 背景スターフィールド
 - `src/effects/VisualEffects.ts` - 視覚エフェクト管理
-- `src/audio/AudioManager.ts` - サウンド管理システム
-- `src/audio/SoundLibrary.ts` - 音響素材管理
-- `src/components/Game/EffectsRenderer.tsx` - エフェクト描画コンポーネント
-- 更新された`src/App.tsx` - エフェクト統合
+- `src/audio/AudioManager.ts` - Web Audio API管理
+- `src/hooks/useVisualEffects.ts` - 視覚エフェクトReactフック
+- `src/hooks/useAudioSystem.ts` - 音響システムReactフック
+- 更新された`src/App.tsx` - 完全統合
 
-### 🔄 デプロイ: 即座
+### 🔧 **重要な修正事項（2025/06/14）**
+
+#### **第1回修正: 視覚エフェクト描画順序**
+- [x] **🚨 敵表示バグ修正**
+  - **問題**: 2回目のゲームから敵が見えなくなる問題
+  - **原因**: 視覚エフェクトの描画順序が不正（パーティクルが敵の前面に描画）
+  - **解決**: `VisualEffects.render()`を`renderBackground()`と`renderParticles()`に分離
+  - **修正ファイル**: `src/effects/VisualEffects.ts`, `src/hooks/useVisualEffects.ts`, `src/App.tsx`
+  - **修正内容**: 
+    ```typescript
+    // 修正前: 全エフェクトが一括描画（バグ）
+    visualEffects.renderEffects(ctx) // ゲームオブジェクトより前に描画
+    
+    // 修正後: 適切な描画順序
+    visualEffects.renderBackground(ctx) // 背景のみ（ゲームオブジェクトより前）
+    // ... ゲームオブジェクト描画 ...
+    visualEffects.renderParticles(ctx)  // パーティクルのみ（ゲームオブジェクトより後）
+    ```
+
+- [x] **📱 モバイルUI最適化**
+  - **問題**: スマートフォンでゲーム統計がゲーム画面に被る可能性
+  - **解決**: レスポンシブ`CompactStatsDisplay`コンポーネント作成
+  - **機能**: 
+    - デスクトップ: 従来通りの詳細表示
+    - モバイル: コンパクトな1行表示 + 展開可能な詳細情報
+    - 画面幅768px以下で自動切り替え
+  - **新規ファイル**: `src/components/Game/CompactStatsDisplay.tsx`
+  - **修正ファイル**: `src/App.tsx` - `StatsDisplay`から`CompactStatsDisplay`に変更
+
+#### **第2回修正: ゲームシステム簡素化**
+- [x] **🎯 ゲームオーバー仕組み見直し**
+  - **問題**: HPシステムが不要（敵エリア到達でゲームオーバーのため）
+  - **解決**: HPシステム完全削除、シンプルなゲームオーバー条件に統一
+  - **削除内容**:
+    - `HealthBar`コンポーネントの表示削除
+    - プレイヤーと敵の衝突判定削除
+    - プレイヤーと敵弾の衝突判定削除  
+    - プレイヤー無敵時間ロジック削除
+    - HP死亡判定削除
+  - **残存ゲームオーバー条件**: 敵がプレイヤーエリア到達のみ
+
+- [x] **🚨 敵表示バグ再発修正**
+  - **問題**: 何回かゲームを繰り返すと敵キャラが再び消失
+  - **原因**: 敵レンダラーの初期化タイミング問題
+  - **解決**: 
+    - ゲーム開始時に敵レンダラーを強制リセット
+    - 敵描画ループで確実な再初期化処理
+    - デバッグ用敵数表示の追加
+  - **修正内容**:
+    ```typescript
+    // ゲーム開始時に敵レンダラーリセット
+    startGame() {
+      enemyRenderer.current = null  // 強制リセット
+    }
+    
+    // 描画ループで確実な初期化
+    if (!enemyRenderer.current) {
+      enemyRenderer.current = new EnemyRenderer(ctx)
+    }
+    ```
+
+### 🔄 デプロイ状況
+- ✅ GitHub: 更新完了
+- ✅ Vercel: 稼働中
+- ✅ 動作確認: 完了
+- ✅ **バグ修正**: 完了（敵表示 + モバイルUI）
 
 ---
 
@@ -451,8 +488,8 @@ npm install --save-dev vitest @testing-library/react jsdom
 | Phase 2.5 | ✅ 完了 | 操作改善・難易度調整 | ✅ 稼働中 |
 | Phase 3 | ✅ 完了 | 敵AIシステム | ✅ 稼働中 |
 | Phase 4 | ✅ 完了 | Redux・統計・実績システム | ✅ 稼働中 |
-| Phase 5 | 📋 **実装中** | 視覚・音響強化 | 即座 |
-| Phase 6 | 1週間 | PWA完成 | 即座 |
+| Phase 5 | ✅ 完了 | 視覚・音響エフェクトシステム | ✅ 稼働中 |
+| Phase 6 | 📋 **次回実装** | PWA機能・設定 | 即座 |
 | Phase 7 | 1週間 | 最適化・テスト | 即座 |
 
 ## 🎯 次回実装（Phase 2.5）の詳細計画

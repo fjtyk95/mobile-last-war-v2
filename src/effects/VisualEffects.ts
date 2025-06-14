@@ -25,8 +25,8 @@ export class VisualEffects {
     this.updateScreenShake(deltaTime)
   }
 
-  // 全体描画
-  render(ctx: CanvasRenderingContext2D): void {
+  // 背景描画（ゲームオブジェクトの前）
+  renderBackground(ctx: CanvasRenderingContext2D): void {
     ctx.save()
     
     // スクリーンシェイク適用
@@ -38,9 +38,17 @@ export class VisualEffects {
     this.starField.render(ctx)
     
     ctx.restore()
-    
-    // パーティクルエフェクト描画（シェイクなし）
+  }
+
+  // パーティクルエフェクト描画（ゲームオブジェクトの後）
+  renderParticles(ctx: CanvasRenderingContext2D): void {
     this.particleSystem.render(ctx)
+  }
+
+  // 全体描画（互換性のため残す）
+  render(ctx: CanvasRenderingContext2D): void {
+    this.renderBackground(ctx)
+    this.renderParticles(ctx)
   }
 
   // === エフェクト生成メソッド ===

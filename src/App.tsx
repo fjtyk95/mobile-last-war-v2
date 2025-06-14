@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { HealthBar } from './components/Game/HealthBar'
 import { GameOverScreen } from './components/Game/GameOverScreen'
 import { PauseMenu } from './components/Game/PauseMenu'
-import { StatsDisplay } from './components/Game/StatsDisplay'
+import { CompactStatsDisplay } from './components/Game/CompactStatsDisplay'
 import { AchievementNotification } from './components/Game/AchievementNotification'
 import { usePlayer } from './hooks/usePlayer'
 import { useGameState } from './hooks/useGameState'
@@ -75,6 +74,10 @@ function App() {
     gameStats.startGameSession()
     visualEffects.clearEffects()
     audioSystem.initializeAudio() // ユーザー操作による音響初期化
+    
+    // 敵レンダラーリセット（敵表示バグ修正）
+    enemyRenderer.current = null
+    
     gameData.current = {
       bullets: [],
       lastTime: 0,
@@ -126,8 +129,7 @@ function App() {
       // 時間更新
       gameState.updateTime(deltaTime)
       
-      // プレイヤー無敵時間更新
-      player.updateInvulnerability(deltaTime)
+      // プレイヤー無敵時間更新削除（HP制なし）
 
       // 統計更新
       gameStats.updateScore(gameState.score)
@@ -146,8 +148,8 @@ function App() {
       ctx.fillStyle = '#1a1a2e'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // 背景エフェクト描画（スターフィールド）
-      visualEffects.renderEffects(ctx)
+      // 背景エフェクト描画（スターフィールドのみ）
+      visualEffects.renderBackground(ctx)
 
       // Draw game over line (danger zone indicator) - プレイヤーエリア境界
       const gameOverLine = canvas.height * GAME_BALANCE.ENEMY.GAME_OVER_ZONE_RATIO
@@ -216,54 +218,9 @@ function App() {
       // 画面外の敵を削除
       enemySystem.removeEnemiesOutOfBounds()
 
-      // プレイヤーと敵の衝突判定
-      if (!player.invulnerable) {
-        enemySystem.enemies.forEach(enemy => {
-          if (player.position.x < enemy.position.x + enemy.stats.width &&
-              player.position.x + GAME_BALANCE.PLAYER.WIDTH > enemy.position.x &&
-              player.position.y < enemy.position.y + enemy.stats.height &&
-              player.position.y + GAME_BALANCE.PLAYER.HEIGHT > enemy.position.y) {
-            player.takeDamage(GAME_BALANCE.ENEMY.DAMAGE_TO_PLAYER)
-            
-            // プレイヤーダメージエフェクト
-            visualEffects.createPlayerDamageEffect(
-              player.position.x + GAME_BALANCE.PLAYER.WIDTH / 2,
-              player.position.y + GAME_BALANCE.PLAYER.HEIGHT / 2
-            )
-            
-            // プレイヤーダメージ音
-            audioSystem.playDamageSound()
-            
-            // 敵を削除（ダメージで体力を0にする）
-            enemySystem.damageEnemy(enemy.id, enemy.stats.health)
-          }
-        })
-      }
+      // プレイヤーと敵の衝突判定は削除（敵エリア到達のみでゲームオーバー）
 
-      // プレイヤーと敵弾の衝突判定
-      if (!player.invulnerable) {
-        const bulletsCopy = [...enemySystem.enemyBullets]
-        bulletsCopy.forEach(bullet => {
-          if (player.position.x < bullet.x + bullet.width &&
-              player.position.x + GAME_BALANCE.PLAYER.WIDTH > bullet.x &&
-              player.position.y < bullet.y + bullet.height &&
-              player.position.y + GAME_BALANCE.PLAYER.HEIGHT > bullet.y) {
-            player.takeDamage(GAME_BALANCE.ENEMY.DAMAGE_TO_PLAYER)
-            
-            // プレイヤーダメージエフェクト
-            visualEffects.createPlayerDamageEffect(
-              player.position.x + GAME_BALANCE.PLAYER.WIDTH / 2,
-              player.position.y + GAME_BALANCE.PLAYER.HEIGHT / 2
-            )
-            
-            // プレイヤーダメージ音
-            audioSystem.playDamageSound()
-            
-            // 弾を削除
-            enemySystem.removeEnemyBullet(bullet.id)
-          }
-        })
-      }
+      // プレイヤーと敵弾の衝突判定も削除（敵エリア到達のみでゲームオーバー）
 
       // Update bullets
       gameData.current.bullets = gameData.current.bullets.filter(bullet => {
@@ -335,48 +292,30 @@ function App() {
         })
       })
 
-      // Check player-powerup collisions (直接接触)
-      if (!player.invulnerable) {
-        powerUps.powerUps.forEach(powerUp => {
-          if (player.position.x < powerUp.position.x + powerUp.width &&
-              player.position.x + GAME_BALANCE.PLAYER.WIDTH > powerUp.position.x &&
-              player.position.y < powerUp.position.y + powerUp.height &&
-              player.position.y + GAME_BALANCE.PLAYER.HEIGHT > powerUp.position.y) {
-            powerUps.collectPowerUp(powerUp.id, 'touch', player)
-            gameState.addPowerUpCollection()
-            
-            // パワーアップ収集エフェクト（直接接触 = 悪い効果）
-            visualEffects.createPowerUpCollectEffect(
-              powerUp.position.x + powerUp.width / 2,
-              powerUp.position.y + powerUp.height / 2,
-              false
-            )
-            
-            // パワーアップ収集音（悪い効果）
-            audioSystem.playPowerUpSound(false)
-          }
-        })
-      }
-
-      // ゲームオーバー判定
-      if (player.isDead() && gameState.status === GameStatus.PLAYING) {
-        gameState.gameOver()
-        gameStats.endGameSession('game_over')
-        audioSystem.playGameOverSound()
-        
-        // 実績チェック
-        const newAchievements = gameStats.checkAndUnlockAchievements(gameStats.gameStats)
-        if (newAchievements.length > 0) {
-          setCurrentAchievement(newAchievements[0])
-          visualEffects.createAchievementEffect()
-          audioSystem.playAchievementSound()
+      // Check player-powerup collisions (直接接触) - 無敵判定削除
+      powerUps.powerUps.forEach(powerUp => {
+        if (player.position.x < powerUp.position.x + powerUp.width &&
+            player.position.x + GAME_BALANCE.PLAYER.WIDTH > powerUp.position.x &&
+            player.position.y < powerUp.position.y + powerUp.height &&
+            player.position.y + GAME_BALANCE.PLAYER.HEIGHT > powerUp.position.y) {
+          powerUps.collectPowerUp(powerUp.id, 'touch', player)
+          gameState.addPowerUpCollection()
+          
+          // パワーアップ収集エフェクト（直接接触 = 悪い効果）
+          visualEffects.createPowerUpCollectEffect(
+            powerUp.position.x + powerUp.width / 2,
+            powerUp.position.y + powerUp.height / 2,
+            false
+          )
+          
+          // パワーアップ収集音（悪い効果）
+          audioSystem.playPowerUpSound(false)
         }
-      }
+      })
 
-      // Draw player (triangle spaceship)
-      if (player.invulnerable) {
-        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(currentTime * 0.01)
-      }
+      // 旧HP死亡判定削除（敵エリア到達のみでゲームオーバー）
+
+      // Draw player (triangle spaceship) - 無敵表示削除
       ctx.fillStyle = '#0066ff'
       ctx.beginPath()
       ctx.moveTo(player.position.x + GAME_BALANCE.PLAYER.WIDTH / 2, player.position.y)
@@ -384,11 +323,22 @@ function App() {
       ctx.lineTo(player.position.x + GAME_BALANCE.PLAYER.WIDTH, player.position.y + GAME_BALANCE.PLAYER.HEIGHT)
       ctx.closePath()
       ctx.fill()
-      ctx.globalAlpha = 1
 
       // Draw new enemy system
-      if (enemyRenderer.current) {
+      if (!enemyRenderer.current) {
+        enemyRenderer.current = new EnemyRenderer(ctx)
+      }
+      
+      // デバッグ: 敵の数を表示
+      ctx.fillStyle = '#00ff00'
+      ctx.font = '12px Arial'
+      ctx.textAlign = 'left'
+      ctx.fillText(`Enemies: ${enemySystem.enemies.length}`, 10, canvas.height - 20)
+      
+      if (enemyRenderer.current && enemySystem.enemies.length > 0) {
         enemyRenderer.current.drawEnemies(enemySystem.enemies)
+      }
+      if (enemyRenderer.current && enemySystem.enemyBullets.length > 0) {
         enemyRenderer.current.drawEnemyBullets(enemySystem.enemyBullets)
       }
 
@@ -412,6 +362,9 @@ function App() {
           powerUp.position.y + powerUp.height / 2 + 6
         )
       })
+
+      // パーティクルエフェクト描画（最前面）
+      visualEffects.renderParticles(ctx)
 
       animationId = requestAnimationFrame(gameLoop)
     }
@@ -586,8 +539,7 @@ function App() {
 
   return (
     <div className="app">
-      {/* ゲームUI */}
-      <HealthBar health={player.health} maxHealth={player.maxHealth} />
+      {/* ゲームUI - HPバー削除（敵エリア到達でゲームオーバーのため） */}
       
       {/* ポーズボタン */}
       <button
@@ -609,8 +561,8 @@ function App() {
         ⏸
       </button>
 
-      {/* 拡張統計表示 */}
-      <StatsDisplay 
+      {/* レスポンシブ統計表示 */}
+      <CompactStatsDisplay 
         stats={gameStats.gameStats}
         getPlayTimeFormatted={gameStats.getPlayTimeFormatted}
         getEfficiencyRating={gameStats.getEfficiencyRating}
