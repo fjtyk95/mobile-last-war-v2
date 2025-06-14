@@ -1,0 +1,466 @@
+# Mobile Last War v2 - 段階的実装計画書
+
+## 🚀 実装フェーズ概要
+
+本プロジェクトは、継続的な改善とデプロイを前提とした7つのフェーズに分けて実装する。各フェーズは1-2週間程度で完了し、すぐにデプロイして動作確認を行う。
+
+## 📋 Phase 1: 基本ゲーム機能 ✅ **完了**
+
+### 実装済み機能
+- [x] React + TypeScript + Vite環境構築
+- [x] Canvas 2Dベースのゲームループ
+- [x] プレイヤー機体（三角形）の移動・射撃
+- [x] 敵スポーン・移動システム
+- [x] 弾丸システムと当たり判定
+- [x] 基本スコアシステム
+- [x] タッチ・マウス操作対応
+- [x] レスポンシブデザイン
+
+---
+
+## 🎯 Phase 2: ゲームシステム拡張 ✅ **完了**
+
+### 実装済み機能
+- [x] プレイヤーヘルスシステム（HP表示、ダメージ、無敵時間）
+- [x] パワーアップシステム（撃破vs接触の効果差）
+- [x] ゲームオーバー画面（統計、リスタート機能）
+- [x] ポーズ機能（一時停止、再開、メニュー）
+- [x] UI/UX改善（ヘルスバー、レベル表示、統計）
+- [x] ハイスコア永続化システム
+
+### デプロイ状況
+- ✅ GitHub: 更新済み
+- ✅ Vercel: 稼働中
+- ✅ 動作確認: 完了
+
+---
+
+## 🕹️ Phase 2.5: 操作システム改善 📋 **計画中**
+
+### 🎯 実装目標
+より直感的で快適なモバイルゲーム体験の実現
+
+### 📝 実装タスク
+
+#### 2.5.1 プレイヤー操作の改善
+```typescript
+// プレイヤー位置制限
+const PLAYER_AREA_RATIO = 0.2 // 画面下部20%
+const fixedPlayerY = canvas.height * (1 - PLAYER_AREA_RATIO)
+
+// 左右移動のみの制御
+const updatePlayerPosition = (touchX: number) => {
+  const newX = Math.max(0, Math.min(canvas.width - 40, touchX - 20))
+  player.updatePosition({ x: newX, y: fixedPlayerY })
+}
+```
+
+#### 2.5.2 自動連射システム
+```typescript
+// 攻撃力に応じた連射間隔
+const getFireRate = (power: number): number => {
+  const baseInterval = 200 // 基本200ms
+  const minInterval = 100  // 最小100ms
+  const reduction = Math.floor((power - 10) / 5) * 20
+  return Math.max(minInterval, baseInterval - reduction)
+}
+
+// 自動射撃処理
+const autoFire = (currentTime: number) => {
+  const fireInterval = getFireRate(player.power)
+  if (currentTime - lastShot > fireInterval) {
+    createBullet(player.position)
+    lastShot = currentTime
+  }
+}
+```
+
+#### 2.5.3 難易度バランス調整
+```typescript
+// レベル別難易度
+const getDifficultyParams = (level: number) => {
+  if (level <= 5) {
+    return {
+      spawnInterval: 1500 - (level - 1) * 100,
+      enemySpeed: 1.5 + (level - 1) * 0.2
+    }
+  } else if (level <= 10) {
+    return {
+      spawnInterval: 1000 - (level - 5) * 60,
+      enemySpeed: 2.5 + (level - 5) * 0.2
+    }
+  } else {
+    return {
+      spawnInterval: 700,
+      enemySpeed: 3.5,
+      scoreMultiplier: 1.5
+    }
+  }
+}
+```
+
+### 📊 成果物
+- `src/hooks/useAutoFire.ts` - 自動連射管理
+- `src/utils/difficultyCalculator.ts` - 難易度計算
+- `src/constants/gameBalance.ts` - バランス設定
+- 更新された`src/App.tsx` - 操作システム統合
+
+### 🔄 デプロイ計画
+1. 操作システム改善後即座にGitHubプッシュ
+2. Vercel自動デプロイ
+3. モバイル実機での操作感確認
+4. バランス微調整とフィードバック反映
+
+### 📝 実装タスク
+
+#### 2.1 プレイヤーライフ・ヘルスシステム
+```typescript
+// 実装ファイル: src/types/game.types.ts
+interface Player {
+  health: number          // 現在HP
+  maxHealth: number      // 最大HP  
+  position: Position
+  power: number          // 攻撃力
+  weapons: WeaponType[]  // 武器種類
+}
+
+// 実装ファイル: src/hooks/usePlayer.ts
+const usePlayer = () => {
+  const takeDamage = (amount: number) => void
+  const heal = (amount: number) => void
+  const isDead = () => boolean
+}
+```
+
+**実装手順:**
+1. プレイヤーヘルス状態の追加
+2. ダメージ処理ロジック
+3. HP表示UI（画面上部）
+4. 死亡判定とゲームオーバー
+
+#### 2.2 パワーアップシステム
+```typescript
+// パワーアップアイテム定義
+interface PowerUp {
+  id: string
+  type: PowerUpType
+  position: Position
+  collectMethod: 'shoot' | 'touch'
+  effect: PowerUpEffect
+}
+
+enum PowerUpType {
+  DAMAGE_UP = 'damage_up',
+  MULTI_SHOT = 'multi_shot', 
+  HEALTH = 'health',
+  SHIELD = 'shield',
+  DAMAGE_DOWN = 'damage_down' // 直接触れた場合
+}
+```
+
+**実装手順:**
+1. パワーアップアイテムの生成ロジック
+2. 弾による撃破処理（正効果）
+3. 直接接触処理（負効果）
+4. 効果適用システム
+5. 視覚的フィードバック
+
+#### 2.3 改良されたUI
+```typescript
+// ゲーム状態管理
+enum GameStatus {
+  MENU = 'menu',
+  PLAYING = 'playing', 
+  PAUSED = 'paused',
+  GAME_OVER = 'gameOver'
+}
+```
+
+**実装手順:**
+1. ポーズ機能とメニュー
+2. ゲームオーバー画面
+3. リスタート機能
+4. スコア表示の強化
+
+### 📊 成果物
+- `src/components/Game/HealthBar.tsx`
+- `src/components/Game/PowerUpSystem.tsx` 
+- `src/components/Game/PauseMenu.tsx`
+- `src/components/Game/GameOverScreen.tsx`
+- `src/hooks/useGameState.ts`
+- `src/hooks/usePowerUps.ts`
+
+### 🔄 デプロイ計画
+1. 機能完成後即座にGitHubプッシュ
+2. Vercel自動デプロイ
+3. 動作確認・バグ修正
+4. 次フェーズ開始
+
+---
+
+## 🤖 Phase 3: 敵・AIシステム ✅ **完了**
+
+### 🎯 実装目標
+多様な敵タイプと行動パターンの実装
+
+### 実装済み機能
+- [x] **4種類の敵タイプ**
+  - Basic: 直線移動、基本的な敵
+  - Fast: ジグザグ移動、素早い敵
+  - Tank: 高耐久・射撃可能、重装甲敵
+  - Boss: サイン波移動・複数弾射撃、強力な敵
+- [x] **AI移動パターンシステム**
+  - Linear: 直線下降
+  - Zigzag: ジグザグ移動
+  - Sine Wave: サイン波移動
+  - Circular: 円運動
+  - Chase: プレイヤー追跡
+- [x] **敵攻撃システム**
+  - Tank・Bossタイプの射撃機能
+  - 複数弾・拡散射撃
+  - 敵弾とプレイヤーの衝突判定
+- [x] **レベル対応スポーンシステム**
+  - レベルに応じた敵タイプ出現率調整
+  - 敵体力のレベル別スケーリング
+- [x] **視覚的改善**
+  - 敵タイプ別の専用グラフィック
+  - ヘルスバー表示（Tank・Boss）
+  - ダメージフラッシュ効果
+
+### 📊 成果物
+- `src/types/enemy.types.ts` - 敵タイプ定義
+- `src/hooks/useEnemySystem.ts` - 敵管理システム
+- `src/utils/enemyMovement.ts` - 移動パターンハンドラー
+- `src/utils/enemyRenderer.ts` - 敵描画システム
+- `src/utils/idGenerator.ts` - IDジェネレーター
+- 更新された`src/App.tsx` - 新システム統合
+
+### 🔧 修正済み事項
+- [x] **敵撃破システムの修正**
+  - Basic・Fast敵を1発で撃破可能に調整
+  - Tank敵は3発、Boss敵は5発で撃破
+  - 衝突判定ロジックの最適化
+- [x] **ゲームオーバー条件の修正** 
+  - 敵がプレイヤーエリア（画面下部80%）到達で即座にゲームオーバー
+  - 専用の`checkGameOver`関数で最優先チェック
+  - DANGER ZONE表示の追加とデバッグログ追加
+- [x] **弾丸システムの修正**
+  - 敵弾とプレイヤーの衝突判定改善
+  - メモリリーク防止の配列操作修正
+- [x] **ゲームループ処理順序の最適化**
+  - ゲームオーバーチェックを最優先で実行
+  - ゲームオーバー時は処理を即座に停止
+
+### 🔄 デプロイ状況
+- ✅ GitHub: 更新準備完了
+- ⏳ Vercel: デプロイ待ち
+
+---
+
+## 🗄️ Phase 4: 高度なゲーム機能
+
+### 🎯 実装目標
+状態管理の強化とハイスコアシステム
+
+### 📝 実装タスク
+
+#### 4.1 Redux Toolkit導入
+```bash
+npm install @reduxjs/toolkit react-redux redux-persist
+```
+
+#### 4.2 ハイスコアシステム
+```typescript
+interface GameStats {
+  highScore: number
+  totalGamesPlayed: number
+  totalEnemiesKilled: number
+  averageScore: number
+  bestSurvivalTime: number
+}
+```
+
+### 🔄 デプロイ: 即座
+
+---
+
+## 🎨 Phase 5: 視覚・音響効果
+
+### 🎯 実装目標
+PixiJSによる高性能レンダリングとエフェクト
+
+### 📝 実装タスク
+
+#### 5.1 PixiJS導入
+```bash
+npm install pixi.js @pixi/sound
+```
+
+#### 5.2 視覚エフェクト
+- パーティクルシステム
+- 爆発エフェクト  
+- 背景スクロール
+- トレイルエフェクト
+
+#### 5.3 サウンドシステム
+- 効果音（射撃、爆発、パワーアップ）
+- BGM
+- オーディオ設定
+
+### 🔄 デプロイ: 即座
+
+---
+
+## 📱 Phase 6: PWA機能
+
+### 🎯 実装目標
+本格的なPWAアプリケーション化
+
+### 📝 実装タスク
+
+#### 6.1 Service Worker
+```typescript
+// public/sw.js
+const CACHE_NAME = 'mobile-last-war-v2'
+const urlsToCache = [
+  '/',
+  '/static/js/bundle.js',
+  '/static/css/main.css'
+]
+```
+
+#### 6.2 Web App Manifest
+```json
+{
+  "name": "Mobile Last War",
+  "short_name": "LastWar",
+  "display": "fullscreen",
+  "orientation": "portrait"
+}
+```
+
+#### 6.3 設定機能
+- グラフィック品質調整
+- 音量設定
+- 操作設定
+- デバッグ表示
+
+### 🔄 デプロイ: 即座
+
+---
+
+## ⚡ Phase 7: 最適化・品質向上
+
+### 🎯 実装目標
+パフォーマンス最適化とテスト実装
+
+### 📝 実装タスク
+
+#### 7.1 パフォーマンス最適化
+```typescript
+// オブジェクトプーリング
+class ObjectPool<T> {
+  private pool: T[] = []
+  acquire(): T
+  release(obj: T): void
+}
+
+// メモリ監視
+class MemoryMonitor {
+  trackUsage(): number
+  cleanupIfNeeded(): void
+}
+```
+
+#### 7.2 テスト実装
+```bash
+npm install --save-dev vitest @testing-library/react jsdom
+```
+
+#### 7.3 品質向上
+- ESLint/Prettier設定強化
+- TypeScript strict mode
+- アクセシビリティ対応
+
+### 🔄 デプロイ: 即座
+
+---
+
+## 📅 実装スケジュール
+
+| フェーズ | 期間 | 主要成果物 | デプロイ |
+|---------|------|-----------|---------|
+| Phase 1 | ✅ 完了 | 基本ゲーム | ✅ 稼働中 |
+| Phase 2 | ✅ 完了 | ヘルス・パワーアップ・UI | ✅ 稼働中 |
+| Phase 2.5 | 3-5日 | 操作改善・難易度調整 | 即座 |
+| Phase 3 | 1週間 | 敵AIシステム | 即座 |
+| Phase 4 | 1週間 | 状態管理強化 | 即座 |
+| Phase 5 | 2週間 | 視覚・音響強化 | 即座 |
+| Phase 6 | 1週間 | PWA完成 | 即座 |
+| Phase 7 | 1週間 | 最適化・テスト | 即座 |
+
+## 🎯 次回実装（Phase 2.5）の詳細計画
+
+### 即座に開始するタスク
+
+#### Task 2.5.1: プレイヤー操作制限（優先度: 高）
+```typescript
+// 1. プレイヤーY座標固定
+const PLAYER_Y_RATIO = 0.8 // 画面下部20%エリア
+const fixedY = canvas.height * PLAYER_Y_RATIO
+
+// 2. 左右移動のみ許可
+const handleTouch = (e: TouchEvent) => {
+  const x = touch.clientX - rect.left
+  const newX = Math.max(0, Math.min(canvas.width - 40, x - 20))
+  player.updatePosition({ x: newX, y: fixedY })
+}
+```
+
+#### Task 2.5.2: 自動連射システム（優先度: 高）
+```typescript
+// 1. 連射間隔計算
+const getFireInterval = (power: number): number => {
+  return Math.max(100, 200 - (power - 10) * 10)
+}
+
+// 2. 自動射撃実装
+const autoFire = (currentTime: number) => {
+  if (currentTime - lastShot > getFireInterval(player.power)) {
+    createBullet()
+    lastShot = currentTime
+  }
+}
+```
+
+#### Task 2.5.3: 難易度バランス調整（優先度: 中）
+```typescript
+// 1. レベル別パラメータ
+const getDifficulty = (level: number) => ({
+  spawnInterval: Math.max(700, 1500 - level * 80),
+  enemySpeed: Math.min(3.5, 1.5 + level * 0.2)
+})
+```
+
+### 📝 実装チェックリスト
+
+#### Phase 2 開始前確認項目
+- [ ] 現在のコードをGitHubにコミット
+- [ ] Phase 2ブランチ作成
+- [ ] 実装計画の最終確認
+
+#### Phase 2 完了条件
+- [ ] プレイヤーHP表示・管理
+- [ ] ダメージ処理
+- [ ] ゲームオーバー画面
+- [ ] パワーアップシステム
+- [ ] ポーズ機能
+- [ ] 動作テスト完了
+- [ ] Vercelデプロイ成功
+
+---
+
+**策定者**: 開発チーム  
+**策定日**: 2025/01/14  
+**承認**: プロジェクトリーダー  
+**次回更新**: Phase 2完了時

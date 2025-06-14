@@ -1,0 +1,127 @@
+// Mobile Last War v2 - Game Balance Constants
+
+export const GAME_BALANCE = {
+  // プレイヤー設定
+  PLAYER: {
+    INITIAL_HEALTH: 100,
+    INITIAL_POWER: 10,
+    AREA_RATIO: 0.2, // 画面下部20%エリア
+    WIDTH: 40,
+    HEIGHT: 40,
+    INVULNERABLE_TIME: 1000, // 1秒
+  },
+
+  // 射撃システム
+  WEAPON: {
+    BASE_FIRE_INTERVAL: 200, // 基本200ms
+    MIN_FIRE_INTERVAL: 100,  // 最小100ms
+    POWER_REDUCTION_RATE: 10, // 攻撃力1につき10ms短縮
+    BULLET_SPEED: 8,
+    BULLET_WIDTH: 4,
+    BULLET_HEIGHT: 10,
+  },
+
+  // 敵システム
+  ENEMY: {
+    WIDTH: 40,
+    HEIGHT: 40,
+    DAMAGE_TO_PLAYER: 20,
+    BASE_SPAWN_INTERVAL: 1500, // 1.5秒
+    MIN_SPAWN_INTERVAL: 700,   // 0.7秒
+    BASE_SPEED: 1.5,
+    MAX_SPEED: 3.5,
+    GAME_OVER_ZONE_RATIO: 0.8, // 画面下部80%（プレイヤーエリア）に到達でゲームオーバー
+  },
+
+  // レベルシステム
+  LEVEL: {
+    ENEMIES_PER_LEVEL: 10, // 10体撃破でレベルアップ
+    MAX_LEVEL_FOR_SCALING: 10, // レベル10まで難易度上昇
+    SCORE_MULTIPLIER_THRESHOLD: 11, // レベル11以降スコア1.5倍
+  },
+
+  // パワーアップシステム
+  POWERUP: {
+    SPAWN_CHANCE: 0.3, // 30%の確率
+    WIDTH: 25,
+    HEIGHT: 25,
+    FALL_SPEED: 50, // ピクセル/秒
+    DAMAGE_UP_VALUE: 3, // +3攻撃力（Phase 2から調整）
+    DAMAGE_DOWN_VALUE: -3, // -3攻撃力ペナルティ
+    HEALTH_RESTORE_VALUE: 25, // +25HP回復
+  },
+
+  // スコアシステム
+  SCORE: {
+    ENEMY_KILL: 100,
+    POWERUP_COLLECT: 50,
+    SURVIVAL_PER_SECOND: 1,
+    HIGH_LEVEL_MULTIPLIER: 1.5, // レベル11以降
+  },
+
+  // 難易度カーブ
+  DIFFICULTY: {
+    // レベル1-5: 線形増加
+    LEVEL_1_5: {
+      SPAWN_REDUCTION_PER_LEVEL: 100, // ms
+      SPEED_INCREASE_PER_LEVEL: 0.2,
+    },
+    // レベル6-10: 急激な増加
+    LEVEL_6_10: {
+      SPAWN_REDUCTION_PER_LEVEL: 60, // ms
+      SPEED_INCREASE_PER_LEVEL: 0.2,
+    },
+  },
+
+  // ターゲット生存時間（バランス指標）
+  TARGET_SURVIVAL: {
+    BEGINNER: 30, // 30秒
+    INTERMEDIATE: 120, // 2分
+    ADVANCED: 300, // 5分
+  },
+} as const
+
+// 難易度計算関数
+export const getDifficultyParams = (level: number) => {
+  if (level <= 5) {
+    return {
+      spawnInterval: Math.max(
+        GAME_BALANCE.ENEMY.MIN_SPAWN_INTERVAL,
+        GAME_BALANCE.ENEMY.BASE_SPAWN_INTERVAL - (level - 1) * GAME_BALANCE.DIFFICULTY.LEVEL_1_5.SPAWN_REDUCTION_PER_LEVEL
+      ),
+      enemySpeed: GAME_BALANCE.ENEMY.BASE_SPEED + (level - 1) * GAME_BALANCE.DIFFICULTY.LEVEL_1_5.SPEED_INCREASE_PER_LEVEL,
+      scoreMultiplier: 1,
+    }
+  } else if (level <= GAME_BALANCE.LEVEL.MAX_LEVEL_FOR_SCALING) {
+    const baseSpawnAtLevel6 = GAME_BALANCE.ENEMY.BASE_SPAWN_INTERVAL - 4 * GAME_BALANCE.DIFFICULTY.LEVEL_1_5.SPAWN_REDUCTION_PER_LEVEL
+    const baseSpeedAtLevel6 = GAME_BALANCE.ENEMY.BASE_SPEED + 4 * GAME_BALANCE.DIFFICULTY.LEVEL_1_5.SPEED_INCREASE_PER_LEVEL
+    
+    return {
+      spawnInterval: Math.max(
+        GAME_BALANCE.ENEMY.MIN_SPAWN_INTERVAL,
+        baseSpawnAtLevel6 - (level - 5) * GAME_BALANCE.DIFFICULTY.LEVEL_6_10.SPAWN_REDUCTION_PER_LEVEL
+      ),
+      enemySpeed: Math.min(
+        GAME_BALANCE.ENEMY.MAX_SPEED,
+        baseSpeedAtLevel6 + (level - 5) * GAME_BALANCE.DIFFICULTY.LEVEL_6_10.SPEED_INCREASE_PER_LEVEL
+      ),
+      scoreMultiplier: 1,
+    }
+  } else {
+    // レベル11以降は最高難易度固定
+    return {
+      spawnInterval: GAME_BALANCE.ENEMY.MIN_SPAWN_INTERVAL,
+      enemySpeed: GAME_BALANCE.ENEMY.MAX_SPEED,
+      scoreMultiplier: GAME_BALANCE.SCORE.HIGH_LEVEL_MULTIPLIER,
+    }
+  }
+}
+
+// 連射間隔計算関数
+export const getFireInterval = (power: number): number => {
+  const reduction = (power - GAME_BALANCE.PLAYER.INITIAL_POWER) * GAME_BALANCE.WEAPON.POWER_REDUCTION_RATE
+  return Math.max(
+    GAME_BALANCE.WEAPON.MIN_FIRE_INTERVAL,
+    GAME_BALANCE.WEAPON.BASE_FIRE_INTERVAL - reduction
+  )
+}
