@@ -131,18 +131,29 @@ function App() {
       
       // プレイヤー無敵時間更新削除（HP制なし）
 
-      // 統計更新（撃破数カウンター削除）
+      // 統計更新（レベル・撃破システム削除）
       gameStats.updateScore(gameState.score)
       gameStats.updatePowerUps(gameState.powerUpsCollected)
-      gameStats.updateLevel(gameState.level)
 
       // 視覚エフェクト更新
       visualEffects.updateEffects(deltaTime, currentTime)
       visualEffects.setLevelMultiplier(gameState.level)
 
-      // 時間ベース統合難易度取得（永続ゲーム防止）
-      const survivalTime = Math.floor(gameState.time / 1000)
-      const difficulty = getFinalDifficultyParams(gameState.level, survivalTime)
+      // シンプルな時間ベース難易度調整（30秒毎に段階的上昇）
+      const survivalTime = Math.floor(gameState.time / 1000) // 生存秒数
+      let spawnInterval = 1000 // 基本1秒
+      
+      if (survivalTime >= 120) {
+        spawnInterval = 200 // 2分以降: 0.2秒に1体
+      } else if (survivalTime >= 90) {
+        spawnInterval = 400 // 1分30秒以降: 0.4秒に1体
+      } else if (survivalTime >= 60) {
+        spawnInterval = 600 // 1分以降: 0.6秒に1体
+      } else if (survivalTime >= 30) {
+        spawnInterval = 800 // 30秒以降: 0.8秒に1体
+      }
+      
+      console.log(`生存時間: ${survivalTime}秒, スポーン間隔: ${spawnInterval}ms`)
 
       // Clear canvas
       ctx.fillStyle = '#1a1a2e'
@@ -178,8 +189,8 @@ function App() {
         audioSystem.playShootSound()
       }
 
-      // 新しい敵システムでのスポーン
-      enemySystem.spawnEnemy(currentTime, difficulty.spawnInterval)
+      // 新しい敵システムでのスポーン（時間ベース間隔）
+      enemySystem.spawnEnemy(currentTime, spawnInterval)
       
       // 敵の更新処理
       enemySystem.updateEnemies(deltaTime, currentTime)
@@ -243,12 +254,10 @@ function App() {
             // 弾を削除
             gameData.current.bullets = gameData.current.bullets.filter(b => b !== bullet)
             
-            // 敵にダメージを与える
+            // 敵にダメージを与える（撃破カウント削除）
             const enemyDestroyed = enemySystem.damageEnemy(enemy.id, player.power)
             
             if (enemyDestroyed) {
-              gameState.addEnemyKill()
-              
               // 敵撃破エフェクト
               visualEffects.createEnemyDestroyEffect(
                 enemy.position.x + enemy.stats.width / 2,

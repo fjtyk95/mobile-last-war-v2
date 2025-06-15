@@ -49,9 +49,19 @@ export const useEnemySystem = ({
 
   // 敵の生成
   const spawnEnemy = useCallback((currentTime: number, spawnInterval: number) => {
-    if (currentTime - lastSpawnTime.current < spawnInterval) {
+    // 初回実行時の初期化
+    if (lastSpawnTime.current === 0) {
+      lastSpawnTime.current = currentTime
+      console.log(`初回敵スポーン初期化: currentTime=${currentTime}, spawnInterval=${spawnInterval}`)
       return false
     }
+    
+    const timeSinceLastSpawn = currentTime - lastSpawnTime.current
+    if (timeSinceLastSpawn < spawnInterval) {
+      return false
+    }
+    
+    console.log(`敵スポーン: timeSinceLastSpawn=${timeSinceLastSpawn}, spawnInterval=${spawnInterval}`)
 
     const enemyType = selectEnemyType(currentLevel)
     const config = ENEMY_CONFIGS[enemyType]
@@ -256,6 +266,7 @@ export const useEnemySystem = ({
   const resetEnemySystem = useCallback(() => {
     setEnemies([])
     setEnemyBullets([])
+    // lastSpawnTimeは次回spawnEnemyで初期化される
     lastSpawnTime.current = 0
   }, [])
 
